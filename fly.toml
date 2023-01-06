@@ -25,6 +25,10 @@ processes = []
   auto_rollback = true
   enable_consul = true
 
+[mounts]
+  source="storage_vol"
+  destination="/var/www/html/storage"
+  
 [[services]]
   http_checks = []
   internal_port = 8080
