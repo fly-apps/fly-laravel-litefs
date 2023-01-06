@@ -23,7 +23,7 @@ This repository is a sample Laravel Fly-configured, LiteFS-configured applicatio
 
 # LiteFS Configuration
 
-Once you have a running Laravel Fly application, certain changes need to be done to the Fly.io generated files. Lastly, additional LiteFS-specific configuration files should be created to successfully run LiteFS in a Laravel web application.
+Once you have a running Laravel Fly application, certain changes need to be done to the Fly.io generated files:
 
 ### [fly.toml](https://github.com/fly-apps/fly-laravel-litefs/blob/main/fly.toml)
 
@@ -81,6 +81,10 @@ This is our ENTRYPOINT in our Dockerfile, and the script that runs startup scrip
 ```
 exec litefs mount
 ```
+
+---
+
+Lastly, additional LiteFS-specific configuration files should be created to successfully run LiteFS in a Laravel web application:
 
 ### [etc/litefs.yml](https://github.com/fly-apps/fly-laravel-litefs/blob/main/etc/litefs.yml)
 This file serves as the configuration reference LiteFS will use on `litefs mount` above. You can find a whole reference on it [here](https://fly.io/docs/litefs/config/#config-file-search-path). This section highlights the Laravel-config relevant parts of the [file](https://github.com/fly-apps/fly-laravel-litefs/blob/main/etc/litefs.yml) we've created for this repository.
