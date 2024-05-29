@@ -3,33 +3,60 @@
 # storage on disk. It intercepts disk writes to determine transaction boundaries
 # so that those transactions can be saved and shipped to replicas.
 fuse:
-    # This is the path your application will access your SQLite database, it is the same value as the DB_DATABASE specified in your fly.toml
-    dir: "/var/www/html/storage/database"
+  # This is the folder where the database.sqlite our app uses will be located on
+  # This should match the DB_CONNECTION value in our fly.toml file!
+  dir: "/var/www/html/storage/database/database"
+  allow-other: true
 
-    # This option allows non-root users to access the fuse.dir above
-    # This option requires a properly configured fuse.conf file
-    allow-other: true
-
-# The data section describes settings for the internal LiteFS storage. 
-# Make sure to mount a volume that this directory is scoped in so it can be persisted across restarts.
-# However, this data should not be accessed directly by the user application..
+# The data section describes settings for the internal LiteFS storage. We'll 
+# mount a volume to the data directory so it can be persisted across restarts.
+# However, this data should not be accessed directly by the user application.
 data:
-    dir: "/var/www/html/storage/litefs"
+  # This is the folder that litefs will use
+  dir: "/var/www/html/storage/database/litefs"
 
-# Execute this subprocess once LiteFS connects to the cluster.
-# The execution below basically starts our Laravel server 
-# Because remember, the below process was removed from .fly/entrypoint.sh to execute litefs instead
-exec: "supervisord -c /etc/supervisor/supervisord.conf"
+# This flag ensure that LiteFS continues to run if there is an issue on starup.
+# It makes it easy to ssh in and debug any issues you might be having rather
+# than continually restarting on initialization failure.
+exit-on-error: false
+
+# This section defines settings for the option HTTP proxy.
+# This proxy can handle primary forwarding & replica consistency
+# for applications that use a single SQLite database.
+proxy:
+  # This is the port the proxy will use
+  addr: ":8081"
+  # This is where our Laravel app will serve, should match the internal_port for the http_service specified in fly.toml
+  target: "localhost:8080"
+  # This is the sqlite file it will handle transactions for, so make sure it's the same file used by the app
+  db: "database.sqlite"
+  passthrough: 
+    - "*.ico"
+    - "*.png"
+
+# This section defines a list of commands to run after LiteFS has connected
+# and sync'd with the cluster. You can run multiple commands but LiteFS expects
+# the last command to be long-running (e.g. an application server). When the
+# last command exits, LiteFS is shut down.
+exec:
+  # That's right we can run our migration as well!
+  - cmd: "php /var/www/html artisan migrate --force"
+  # Make sure the last command run is our running our server
+  - cmd: "supervisord -c /etc/supervisor/supervisord.conf"
 
 # The lease section specifies how the cluster will be managed. We're using the
 # "consul" lease type so that our application can dynamically change the primary.
 #
 # These environment variables will be available in your Fly.io application.
-# You must specify "experiement.enable_consul" for FLY_CONSUL_URL to be available.
 lease:
-    type: "consul"
-    advertise-url: "http://${HOSTNAME}.vm.${FLY_APP_NAME}.internal:20202"
+  type: "consul"
+  advertise-url: "http://${HOSTNAME}.vm.${FLY_APP_NAME}.internal:20202"
+  candidate: ${FLY_REGION == PRIMARY_REGION}
+  promote: true
 
-    consul:
-      url: "${FLY_CONSUL_URL}"
-      key: "litefs/${FLY_APP_NAME}"
+  consul:
+    # This env variable will be set when we run fly consul attach. so please run that
+    url: "${FLY_CONSUL_URL}"
+    # If you ever get an issue with cluster id not being set in the node, but there's already a cluster id
+    # You can revise the value below to reset the cluster id
+    key: "litefs/${FLY_APP_NAME}"

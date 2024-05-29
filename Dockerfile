@@ -1,13 +1,7 @@
 # syntax = docker/dockerfile:experimental
 
-# Default to PHP 8.2, but we attempt to match
-# the PHP version from the user (wherever `flyctl launch` is run)
-# Valid version values are PHP 7.4+
 ARG PHP_VERSION=8.2
 ARG NODE_VERSION=14
-
-# Get LiteFS image
-FROM flyio/litefs:pr-251 AS litefs
 FROM fideloper/fly-laravel:${PHP_VERSION} as base
 
 # PHP_VERSION needs to be repeated here
@@ -28,29 +22,13 @@ RUN composer install --optimize-autoloader --no-dev \
     && cp .fly/entrypoint.sh /entrypoint \
     && chmod +x /entrypoint
 
-# LITEFS dependencies
-RUN apt-get update && apt-get install bash fuse 
-
-# LITEFS files from etc
-COPY --from=litefs /usr/local/bin/litefs /usr/local/bin/litefs
-ADD etc/litefs.yml /etc/litefs.yml
-ADD etc/fuse.conf /etc/fuse.conf
-
-# If we're using Octane...
-RUN if grep -Fq "laravel/octane" /var/www/html/composer.json; then \
-        rm -rf /etc/supervisor/conf.d/fpm.conf; \
-        if grep -Fq "spiral/roadrunner" /var/www/html/composer.json; then \
-            mv /etc/supervisor/octane-rr.conf /etc/supervisor/conf.d/octane-rr.conf; \
-            if [ -f ./vendor/bin/rr ]; then ./vendor/bin/rr get-binary; fi; \
-            rm -f .rr.yaml; \
-        else \
-            mv .fly/octane-swoole /etc/services.d/octane; \
-            mv /etc/supervisor/octane-swoole.conf /etc/supervisor/conf.d/octane-swoole.conf; \
-        fi; \
-        rm /etc/nginx/sites-enabled/default; \
-        ln -sf /etc/nginx/sites-available/default-octane /etc/nginx/sites-enabled/default; \
-    fi
-
+# LITEFS Dependencies
+RUN apt-get update -y && apt-get install -y ca-certificates fuse3 sqlite3
+# LITEFS Binary
+COPY --from=flyio/litefs:0.5 /usr/local/bin/litefs /usr/local/bin/litefs
+# LITEFS config file move to proper location at /etc
+COPY etc/litefs.yml /etc/litefs.yml
+COPY etc/fuse.conf /etc/fuse.conf
 
 
 # Multi-stage build: Build static assets
@@ -76,6 +54,10 @@ RUN if [ -f "vite.config.js" ]; then \
     if [ -f "yarn.lock" ]; then \
         yarn install --frozen-lockfile; \
         yarn $ASSET_CMD; \
+    elif [ -f "pnpm-lock.yaml" ]; then \
+        corepack enable && corepack prepare pnpm@latest-8 --activate; \
+        pnpm install --frozen-lockfile; \
+        pnpm run $ASSET_CMD; \
     elif [ -f "package-lock.json" ]; then \
         npm ci --no-audit; \
         npm run $ASSET_CMD; \
@@ -98,5 +80,3 @@ RUN rsync -ar /var/www/html/public-npm/ /var/www/html/public/ \
     && chown -R www-data:www-data /var/www/html/public
 
 EXPOSE 8080
-
-ENTRYPOINT ["/entrypoint"]
