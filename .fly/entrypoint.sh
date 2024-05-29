@@ -7,6 +7,6 @@ for f in /var/www/html/.fly/scripts/*.sh; do
 done
 chown -R www-data:www-data /var/www/html
 
-
+# Make sure to run litefs! It will run exec to run our server later
 exec litefs mount
 
