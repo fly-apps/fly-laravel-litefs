@@ -33,17 +33,11 @@ Set your SQLite connection in the storage directory.
     DB_CONNECTION="sqlite"
     DB_DATABASE="/var/www/html/storage/database/database.sqlite"
 ```
-If you prefer to use consul for leader election, go ahead and enable it under [experimental]:
-```
-[experimental]
-  ...
-  enable_consul = true
-```
-To persist data in your `storage` folder, make sure to mount volume to the directory:
+Then persist data in the `storage/database`folder as that holdes our database/ and litefs/ directories. This can be done by mounting a volume to the directory:
 ```
 [mounts]
   source="storage_vol"
-  destination="/var/www/html/storage"
+  destination="/var/www/html/storage/database"
 ```
 
 ### [Dockerfile](https://github.com/fly-apps/fly-laravel-litefs/blob/main/Dockerfile)
@@ -100,14 +94,15 @@ exec:
 
 <b>5. The exec</b> - Finally, we arrive at the `exec` block. We can use this subprocess to run our migrations, and most importantly start our server! 
 
-# Forwarding Write Requests to the Primary Node
+Of course it still has the lease section which you shouldn't forget to add in, as well as the proxy section below that's useful for forwarding write requests. See our whole configuration for the etc/litefs.yml file [here](https://github.com/fly-apps/fly-laravel-litefs/blob/main/etc/litefs.yml).
+
+**Forwarding Write Requests to the Primary Node**
+
 We want to forward write transactions to the primary node and not replica nodes. We can use LiteFS's built in proxy layer for forwarding write requests to the primary node.
 
 We can do this by adding the proxy section in our etc/litefs.yml file:
 
 ```yml
-# etc/litefs.yml
-
 proxy:
   # This is the port the proxy will use
   addr: ":8081"
