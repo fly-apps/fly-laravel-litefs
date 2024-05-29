@@ -18,4 +18,4 @@ Route::get('/', function () {
 });
 
 Route::get('/posts/create',[\App\Http\Controllers\PostController::class,'create']);
-Route::post('/posts/store',[\App\Http\Controllers\PostController::class,'store'])->middleware(['fly-replay.litefs-write']);;
+Route::post('/posts/store',[\App\Http\Controllers\PostController::class,'store']);

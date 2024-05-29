@@ -22,7 +22,7 @@ processes = []
   
 [[mounts]]
   source = 'litefs'
-  destination = '/var/www/html/storage/database/litefs'
+  destination = '/var/www/html/storage/database'
   
 [http_service]
   internal_port = 8080
