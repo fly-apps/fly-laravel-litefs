@@ -22,54 +22,41 @@ This repository is a sample Laravel Fly-configured, LiteFS-configured applicatio
 
 # LiteFS Configuration
 
-Once you have a running Laravel Fly application, certain changes need to be done to the Fly.io generated files:
+Once you have a running Laravel Fly application, certain changes need to be done to your project's files:
+
+### SubFolders
+First create a subfolder `database` inside the `storage` folder. We'll later mount a volume to this sub-directory to persist data on it and all its sub-directories. It will contain sub-directories: "`database/app`" to hold the sqlite file used by our Laravel app, and "`database/litefs`" for litefs to use in storing its files:
+```
+# We mount a volume to this later
+# to persist data it contains
+mkdir storage/database
+
+# To hold our sqlite file
+mkdir storage/database/app
+
+# For litefs' to store its files
+mkdir storage/database/litefs
+```
+
 
 ### [fly.toml](https://github.com/fly-apps/fly-laravel-litefs/blob/main/fly.toml)
 
-Set your SQLite connection in the storage directory. 
+Set the SQLite connection in the `storage/database/app` directory to use a `database.sqlite` file:
 ```
 [env]
     ...
     DB_CONNECTION="sqlite"
-    DB_DATABASE="/var/www/html/storage/database/database.sqlite"
-```
-If you prefer to use consul for leader election, go ahead and enable it under [experimental]:
-```
-[experimental]
-  ...
-  enable_consul = true
-```
-To persist data in your `storage` folder, make sure to mount volume to the directory:
-```
-[mounts]
-  source="storage_vol"
-  destination="/var/www/html/storage"
+    DB_DATABASE="/var/www/html/storage/database/app/database.sqlite"
 ```
 
-### [Dockerfile](https://github.com/fly-apps/fly-laravel-litefs/blob/main/Dockerfile)
-
-In your dockerfile you'll need to retrieve the LiteFS image, install packages required by LiteFS, and copy litefs configuration files to the [proper location](https://fly.io/docs/litefs/config/#config-file-search-path) in your running container:
+Then, also mount a volume on this `/var/www/html/storage/database` directory to persist data on it:
 ```
-# LITEFS Dependencies
-RUN apt-get update -y && apt-get install -y ca-certificates fuse3 sqlite3
-
-# LITEFS Binary
-COPY --from=flyio/litefs:0.5 /usr/local/bin/litefs /usr/local/bin/litefs
-
-# LITEFS config file move to proper location at /etc
-COPY etc/litefs.yml /etc/litefs.yml
-COPY etc/fuse.conf /etc/fuse.conf
+[[mounts]]
+  source = 'litefs'
+  destination = '/var/www/html/storage/database'
 ```
 
-### [.fly/entrypoint.sh](https://github.com/fly-apps/fly-laravel-litefs/blob/main/.fly/entrypoint.sh) 
-This is our ENTRYPOINT in our Dockerfile, and the script that runs startup scripts and afterwards our server. We'll need to revise this file to ensure we run LiteFS instead of starting our server--once LiteFS successfully runs, it should also handle starting our server:
-```
-exec litefs mount
-```
-
----
-
-Lastly, additional LiteFS-specific configuration files should be created to successfully run LiteFS in a Laravel web application:
+Once you complete revising the `fly.toml` file, proceed with creating LiteFS-specific configuration files needed to successfully run LiteFS in a Laravel web application:
 
 ### [etc/litefs.yml](https://github.com/fly-apps/fly-laravel-litefs/blob/main/etc/litefs.yml)
 This file serves as the configuration reference LiteFS will use on `litefs mount` above. You can find a whole reference on it [here](https://fly.io/docs/litefs/config/#config-file-search-path). This section highlights the Laravel-config relevant parts of the [file](https://github.com/fly-apps/fly-laravel-litefs/blob/main/etc/litefs.yml) we've created for this repository.
@@ -78,13 +65,12 @@ This file serves as the configuration reference LiteFS will use on `litefs mount
 ```yml
 fuse:
     # This is the folder our database.sqlite is located in, as we've specified in our fly.toml file's env.DB_DATABASE attribute 
-    dir: "/var/www/html/storage/database"
+    dir: "/var/www/html/storage/database/app"
     allow-other: true
 
 data:
   # This is the folder that litefs will use
   dir: "/var/www/html/storage/database/litefs"
-
 
 exec: 
   - cmd: "php /var/www/html artisan migrate --force"
@@ -133,6 +119,53 @@ The etc/fuse.conf file is required to enable the etc/litefs.yml's fuse.allow-oth
 user_allow_other
 ```
 
+Finally, we revise files generated for our app by Fly.io during `fly launch` to use LiteFS with our app:
 
+### [Dockerfile](https://github.com/fly-apps/fly-laravel-litefs/blob/main/Dockerfile)
+
+In your dockerfile you'll need to retrieve the LiteFS image, install packages required by LiteFS, and copy litefs configuration files to the [proper location](https://fly.io/docs/litefs/config/#config-file-search-path) in your running container:
+```
+# LITEFS Dependencies
+RUN apt-get update -y && apt-get install -y ca-certificates fuse3 sqlite3
+
+# LITEFS Binary
+COPY --from=flyio/litefs:0.5 /usr/local/bin/litefs /usr/local/bin/litefs
+
+# LITEFS config file move to proper location at /etc
+COPY etc/litefs.yml /etc/litefs.yml
+COPY etc/fuse.conf /etc/fuse.conf
+```
+
+### [.fly/entrypoint.sh](https://github.com/fly-apps/fly-laravel-litefs/blob/main/.fly/entrypoint.sh) 
+This is our ENTRYPOINT in our Dockerfile, and the script that runs startup scripts and afterwards our server. We'll need to revise this file to ensure we run LiteFS instead of starting our server--once LiteFS successfully runs, it should also handle starting our server:
+```
+exec litefs mount
+```
+
+---
+
+
+### ERRORS!
+If you encounter errors in your logs regarding litefs, you can read this page for steps you can follow to possibly fix the error.
+Some common errors are:
+
+1. "cannot become primary, local node has no cluster ID and \"consul\" lease already initialized with cluster ID LFSC0C41533E99503312"
+- to fix this, you'll have to assign a new cluster id your machines. This can be done two ways, with the easiest way being an update of the string value specified in your litefs.yml file's `lease.consul.key` value to a unique value you've not yet specified for your current app. 
+
+```
+# i.e
+
+# Update your existing key from an old value:
+lease
+  consul:
+    key: "litefs/${FLY_APP_NAME}"
+
+---------------------------------------------------------
+
+# TO something different:
+lease:
+  consul:
+    key: "litefs/${FLY_APP_NAME}-2" 
+```
 
 

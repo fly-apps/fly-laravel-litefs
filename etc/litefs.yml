@@ -5,9 +5,9 @@
 fuse:
   # This is the folder where the database.sqlite our app uses will be located on
   # This should match the DB_CONNECTION value in our fly.toml file!
-  dir: "/var/www/html/storage/database/database"
+  dir: "/var/www/html/storage/database/app"
   allow-other: true
-
+ 
 # The data section describes settings for the internal LiteFS storage. We'll 
 # mount a volume to the data directory so it can be persisted across restarts.
 # However, this data should not be accessed directly by the user application.
