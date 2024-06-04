@@ -1,9 +1,11 @@
-# fly.toml file generated for dark-sound-870 on 2023-01-05T17:47:22+03:00
+# fly.toml app configuration file generated for testlitefs-test on 2024-05-29T02:01:54+08:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
 
-app = "dark-sound-870"
-kill_signal = "SIGINT"
-kill_timeout = 5
-processes = []
+app = 'testlitefs-test'
+primary_region = 'nrt'
+console_command = 'php /var/www/html/artisan tinker'
 
 [build]
   [build.args]
@@ -11,19 +13,20 @@ processes = []
     PHP_VERSION = "8.1"
 
 [env]
-  APP_ENV = "production"
-  LOG_CHANNEL = "stderr"
-  LOG_LEVEL = "info"
-  LOG_STDERR_FORMATTER = "Monolog\\Formatter\\JsonFormatter"
-  DB_CONNECTION="sqlite"
-  DB_DATABASE="/var/www/html/storage/database/database.sqlite"
-  SESSION_DRIVER="cookie"
-  SESSION_SECURE_COOKIE="true"
-  
+  APP_ENV = 'production'
+  LOG_CHANNEL = 'stderr'
+  LOG_LEVEL = 'info'
+  LOG_STDERR_FORMATTER = 'Monolog\Formatter\JsonFormatter'
+  SESSION_DRIVER = 'cookie'
+  SESSION_SECURE_COOKIE = 'true'
+  DB_CONNECTION = 'sqlite'
+  DB_DATABASE = '/var/www/html/storage/database/app/database.sqlite'
+
+
 [[mounts]]
   source = 'litefs'
   destination = '/var/www/html/storage/database'
-  
+
 [http_service]
   internal_port = 8080
   force_https = true
